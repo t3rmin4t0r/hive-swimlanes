@@ -92,14 +92,14 @@ class HiveLog(object):
 				"stage": "query",
 				"time": timeto(q.start),
 				"type": "QueryStart",
-				"label": "start"
+				"label": "query-start"
 			})
 			data.append({
 				"task": 0,
 				"stage": "query",
 				"time": timeto(q.end),
 				"type": "QueryEnd",
-				"label": "end (%d)" % duration(q.start, q.end)
+				"label": "%d s" % duration(q.start, q.end)
 			})
 		for i,t in tasks:
 			data.append({
@@ -107,14 +107,14 @@ class HiveLog(object):
 				"stage": t.stage,
 				"time": timeto(t.start),
 				"type": "task",
-				"label": "Start"
+				"label": "%s" % t.stage
 			})
 			data.append({
 				"task": i,
 				"stage": t.stage,
 				"time": timeto(t.end),
 				"type": "task",
-				"label": "End (%d)" % duration(t.start, t.end)
+				"label": "%d s" % duration(t.start, t.end)
 			})
 		return data
 	

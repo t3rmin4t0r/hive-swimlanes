@@ -30,14 +30,14 @@
 				geometry: 'line', 
 				mapping: { x: 'time', y: 'task', group: 'stage', color: 'type'}
 			},{ geometry: 'text',
-				mapping: { x: 'time', y: 'task', group: 'stage', text: '{stage}-{label}'}
+				mapping: { x: 'time', y: 'task', group: 'stage', text: '{label}'}
 			}
 			],
             scales: [
                 { type: 'linear', aesthetic: 'x' }
             ]
 		});
-		swimlines.render(1080, 1080, d3.select('#examples'), swimlanes);		
+		swimlines.render(800, 640, d3.select('#examples'), swimlanes);		
 	});
 })();
 </script>
