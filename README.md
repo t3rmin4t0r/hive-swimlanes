@@ -5,6 +5,9 @@ Swimlane visualization for hive
 
 Inspired by https://twitter.com/avibryant/status/243404021082255360
 
+git submodule init
+git submodule update
+
 Run 
 
 python swimlanes.py sample-hive.txt  > data.js
