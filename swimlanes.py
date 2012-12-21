@@ -5,6 +5,7 @@ import json
 from getopt import getopt
 
 JOB_HISTORY_DIR="jhist/"
+QUERY_ID = None
 
 def getJob(job):
 	global JOB_HISTORY_DIR
@@ -23,13 +24,17 @@ class JobHistory(object):
 		self.end = max(times)
 
 	def process(self, t):
-		data = {"type" : str(t["type"])}
+		data = {"type" : str(t["type"]), "task":"", "taskType" : ""}
 		event = t["event"].values()[0]
 		for k in event:
 			if(k.rfind("Time") != -1):
 				data[str(k)] = event[k]
 				if(k == "startTime" or k == "finishTime"):
 					data["time"] = event[k]
+			if(k == "taskid"):
+				data["task"] = str(event[k])
+			if(k == "taskType"):
+				data["taskType"] = str(event[k])
 		return data
 
 class HiveTask(object):
@@ -42,6 +47,7 @@ class HiveTask(object):
 		self.stage = stage
 		first = pair[::].pop()
 		job = first["job"]
+		self.job = job
 		jhist = getJob(job)
 		if(jhist):
 			self.subtimings = JobHistory(jhist)
@@ -59,25 +65,49 @@ class HiveQuery(object):
 		self.pair = pair
 		self.query = query
 
+	
+class LogSieve(object):
+	def __init__(self):
+		self.query = QUERY_ID
+		if(QUERY_ID):
+			self.state = 0 # filter lines
+		else:
+			self.state = 2 # always on
+	def sieve(self, g):
+		if(not g): return False
+		if(self.state == 0):
+			if(g["type"] == "QueryStart"):
+				if(g["query"] == self.query):
+					self.state = 1
+					return True
+			elif(g["type"] == "QueryEnd"):
+				if(g["query"] == self.query):
+					self.state = 0
+					return True
+			return False
+		return True
+
 class HiveLog(object):
 	patterns = [
 	re.compile('(?P<type>Task[^ ]*).*TASK_NAME="(?P<name>[^"]*)".*TASK_ID="(?P<id>[^"]*)" QUERY_ID="(?P<query>[^"]*)".*? (TASK_HADOOP_ID="(?P<job>[^"]*)" )?TIME="(?P<time>[^"]*)"')
 	, re.compile('(?P<type>Query[^ ]*).*QUERY_ID="(?P<query>[^"]*)".*TIME="(?P<time>[^"]*)"')
 	, re.compile('(?P<type>Session[^ ]*) SESSION_ID="(?P<sid>[^"]*)" .*TIME="(?P<time>[^"]*)"')
 	]
+
 	def __init__(self, f):
-		data = filter(lambda a:a, [self.process(l) for l in open(f)])		
+		data = filter(LogSieve().sieve, [self.process(l) for l in open(f)])		
 		self.timeline = sorted(data, key=lambda a:a["time"])
+		self.tasks = sorted(self.grouptasks(), key=lambda t:t.start)
+		self.queries = sorted(self.markqueries(), key=lambda t:t.start)
 		sessions = filter(lambda a:a.has_key("sid"), self.timeline)
 		if(sessions): 
 			session = sessions[0]
 			self.session = session["sid"]
 			self.start = session["time"]
-		else:	
+		else:
 			self.start = 0
+			if(self.queries): self.start = self.queries[0].start		
 			self.session = "Unknown"
-		self.tasks = sorted(self.grouptasks(), key=lambda t:t.start)
-		self.queries = sorted(self.markqueries(), key=lambda t:t.start)
 	
 	def grouptasks(self):
 		istask = lambda t: (t["type"] == "TaskStart" or t["type"] == "TaskEnd")
@@ -142,39 +172,49 @@ class HiveLog(object):
 			})
 		i = 1
 		for t in tasks:
+			j = i
 			data.append({
 				"task": i,
 				"stage": t.stage,
 				"time": timeto(t.start),
-				"type": "task-%s" % t.stage,
+				"type": "task-%d" % i,
 				"label": "%s" % t.stage
 			})
 			if(t.subtimings):
-				for st in t.subtimings.timeline:
+				taskset = {}
+				for st in t.subtimings.timeline:					
+					if((not st["task"]) or (not taskset.has_key(st["task"]))):						
+						i += 1
+						taskset[st["task"]] = i
+						k = i
+					else:
+						k = taskset[st["task"]]
 					data.append({
-					"task": i,
-					"stage": t.stage,
+					"task": k,
+					"stage": t.stage + st["task"],
 					"time": timeto(st["time"]),
-					"type": "task-%s" % (t.stage),
+					"type": "%s%s" % (st["type"], st["taskType"]),
 					"label": "%s (+%d)" % (st["type"], duration(t.start, st["time"]))
 					})
-					i += 1
 			data.append({
 				"task": i,
 				"stage": t.stage,
 				"time": timeto(t.end),
-				"type": "task-%s" % t.stage,
+				"type": "task-%d" % j,
 				"label": "%s s" % duration(t.end, t.start)
 			})
 			i += 1
 		return data
 	
 def main(args):
-	(opts, args) = getopt(args, "j:")
+	(opts, args) = getopt(args, "j:q:")
 	for k,v in opts:
 		if(k == "-j"):
 			global JOB_HISTORY_DIR
 			JOB_HISTORY_DIR = v
+		if(k == "-q"):
+			global QUERY_ID
+			QUERY_ID = v
 	logs = [HiveLog(f) for f in args]	
 	for l in logs:
 		print "var swimlanes = %s;" % json.dumps(l.swimlanes())
