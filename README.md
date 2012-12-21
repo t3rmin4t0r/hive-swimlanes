@@ -10,6 +10,6 @@ git submodule update
 
 Run 
 
-python swimlanes.py sample-hive.txt  > data.js
+python swimlanes.py -j jhist/ sample-hive.txt  > data.js
 
 to generate swimlanes for the given hive job

@@ -11,6 +11,12 @@
 <script src="gg/gg.js"></script>
 </title>
 
+<style>
+svg {
+	padding-right: 128px;
+}
+</style>
+
 <body>
 <h1>Swimline for hive</h1>
 <div id='examples'></div>
@@ -31,7 +37,9 @@
 				mapping: { x: 'time', y: 'task', group: 'stage', color: 'type'}
 			},{ geometry: 'text',
 				mapping: { x: 'time', y: 'task', group: 'stage', text: '{label}'}
-			}
+			}, { geometry: 'point', 
+				mapping: { x: 'time', y: 'task' }, size: 2
+			},
 			],
             scales: [
                 { type: 'linear', aesthetic: 'x' }
